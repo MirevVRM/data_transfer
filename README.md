@@ -1,4 +1,4 @@
-# 📡 data_transfer
+📡 data_transfer
 
 Python-based LoRa telemetry system for Raspberry Pi 4 and E22-900T22S (UART).  
 Features AES-128 encryption, CRC8 checksum, CSV logging, and automated data collection.
@@ -7,7 +7,7 @@ Features AES-128 encryption, CRC8 checksum, CSV logging, and automated data coll
 
 ---
 
-## 📁 Project Structure
+📁 Project Structure
 
 ```
 data_transfer/
@@ -19,7 +19,19 @@ data_transfer/
 
 ---
 
-## 🔧 Main Components
+📦 Required Python Libraries
+
+The following Python libraries must be installed manually:
+
+pyserial  
+pycryptodome
+
+These are used for UART communication and AES encryption, respectively.
+
+
+---
+
+🔧 Main Components
 
 - `sender.py`: encrypts and sends telemetry packets over UART
 - `receiver.py`: receives packets, validates CRC8, decrypts, and logs
@@ -31,7 +43,7 @@ data_transfer/
 
 ---
 
-## 📦 Data Output
+📦 Data Output
 
 - `sent_data.csv` / `received_data.csv`: telemetry and status
 - `sender_log.txt` / `receiver_log.txt`: detailed event logs
@@ -39,7 +51,7 @@ data_transfer/
 
 ---
 
-## 🔐 Encryption & Integrity
+🔐 Encryption & Integrity
 
 - AES-128 in ECB mode for confidentiality
 - CRC8 checksum added for packet integrity
@@ -47,7 +59,7 @@ data_transfer/
 
 ---
 
-## 👥 Authors
+👥 Authors
 
 - Snopkov D. I.  
 - Shimpf A. A.  
