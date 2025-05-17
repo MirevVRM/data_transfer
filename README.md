@@ -1,5 +1,9 @@
 📡 data_transfer
 
+<p align="center">
+  <img src="docs/img/Image for Raspberry.png" alt="LoRa telemetry system diagram" width="600">
+</p>
+
 Python-based LoRa telemetry system for Raspberry Pi 4 and E22-900T22S (UART).  
 Features AES-128 encryption, CRC8 checksum, CSV logging, and automated data collection.
 
