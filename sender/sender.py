@@ -3,7 +3,8 @@
 # Автор: Snopkov D. I., Shimpf A.A.
 # Версия: май 2025
 # Назначение:
-#   - Отправка телеметрических пакетов по UART-модулю E22-900T22S
+#   - RU: Отправка телеметрических пакетов по UART-модулю E22-900T22S
+#   - EN: Transmitting telemetry packets over UART module E22-900T22S
 #   - Шифрование (AES-128) + CRC8
 # ========================================
 
@@ -15,6 +16,58 @@ from datetime import datetime
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
+# ========== Выбор языка ==========
+def choose_language():
+    lang = input("Выберите язык / Choose language [Rus/Eng] (по умолчанию: Rus): ").strip().lower()
+    return 'eng' if lang == 'eng' else 'rus'
+
+LANG = choose_language()
+
+TEXT = {
+    'rus': {
+        'start': "=== UART-Передатчик (sender.py) ===",
+        'input_prompt': "Ввод параметров скрипта (нажмите Enter для значения по умолчанию)",
+        'delay': "Задержка перед запуском (сек): ",
+        'duration': "Общая длительность работы (сек): ",
+        'interval': "Интервал между отправками (сек): ",
+        'input_error': "Ошибка ввода. Используются значения по умолчанию.",
+        'wait': "Ожидание {} сек перед запуском...",
+        'port_error': "Не удалось открыть порт {}: {}",
+        'start_log': "Старт передачи данных через UART",
+        'param': "Параметры:",
+        'packet_built': "Сформирован пакет ID {}: {}",
+        'sent': "Пакет отправлен.",
+        'sent_log': "Отправлен пакет ID {}",
+        'send_error': "Ошибка при отправке пакета ID {}: {}",
+        'done': "Готово.",
+        'finished': "Завершено: передача окончена",
+        'interrupted': "Прервано пользователем.",
+        'user_stop': "Передача остановлена пользователем"
+    },
+    'eng': {
+        'start': "=== UART Transmitter (sender.py) ===",
+        'input_prompt': "Enter script parameters (press Enter to use defaults)",
+        'delay': "Delay before start (sec): ",
+        'duration': "Total run time (sec): ",
+        'interval': "Interval between transmissions (sec): ",
+        'input_error': "Input error. Using default values.",
+        'wait': "Waiting {} sec before start...",
+        'port_error': "Failed to open port {}: {}",
+        'start_log': "Starting data transmission over UART",
+        'param': "Parameters:",
+        'packet_built': "Packet ID {} generated: {}",
+        'sent': "Packet sent.",
+        'sent_log': "Packet ID {} sent",
+        'send_error': "Failed to send packet ID {}: {}",
+        'done': "Done.",
+        'finished': "Completed: transmission finished",
+        'interrupted': "Interrupted by user.",
+        'user_stop': "Transmission interrupted by user"
+    }
+}
+
+T = TEXT[LANG]
+
 # ========== Логирование ==========
 def log_event(text, logfile):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -25,13 +78,13 @@ def log_event(text, logfile):
 
 # ========== Конфигурация ==========
 def get_config():
-    print("Ввод параметров скрипта (нажмите Enter для значения по умолчанию)")
+    print(T['input_prompt'])
     try:
-        delay = int(input("Задержка перед запуском (сек): ") or 0)
-        duration = int(input("Общая длительность работы (сек): ") or 90)
-        interval = int(input("Интервал между отправками (сек): ") or 30)
+        delay = int(input(T['delay']) or 0)
+        duration = int(input(T['duration']) or 90)
+        interval = int(input(T['interval']) or 30)
     except ValueError:
-        print("Ошибка ввода. Используются значения по умолчанию.")
+        print(T['input_error'])
         delay = 0
         duration = 90
         interval = 30
@@ -95,10 +148,11 @@ def crc8(data: bytes) -> int:
 
 # ========== Основной цикл ==========
 def main():
+    print(T['start'])
     config = get_config()
 
     if config["delay"] > 0:
-        print(f"Ожидание {config['delay']} сек перед запуском...")
+        print(T['wait'].format(config["delay"]))
         time.sleep(config["delay"])
 
     try:
@@ -108,10 +162,10 @@ def main():
             timeout=1
         )
     except Exception as e:
-        print(f"Не удалось открыть порт {config['uart_port']}: {e}")
+        print(T['port_error'].format(config["uart_port"], e))
         return
 
-    log_event("Старт передачи данных через UART", config["log_filename"])
+    log_event(T['start_log'], config["log_filename"])
     start_time = time.time()
 
     try:
@@ -119,8 +173,8 @@ def main():
             packet_id = int(time.time())
             params = generate_parameters()
 
-            print("Параметры:", params)
-            log_event(f"Сформирован пакет ID {packet_id}: {params}", config["log_filename"])
+            print(T['param'], params)
+            log_event(T['packet_built'].format(packet_id, params), config["log_filename"])
 
             save_to_csv(packet_id, params, config["csv_filename"])
 
@@ -131,20 +185,20 @@ def main():
 
             try:
                 uart.write(full_packet)
-                print("Пакет отправлен.")
-                log_event(f"Отправлен пакет ID {packet_id}", config["log_filename"])
+                print(T['sent'])
+                log_event(T['sent_log'].format(packet_id), config["log_filename"])
             except Exception as e:
-                print(f"Ошибка отправки: {e}")
-                log_event(f"Ошибка при отправке пакета ID {packet_id}: {e}", config["log_filename"])
+                print(T['send_error'].format(packet_id, e))
+                log_event(T['send_error'].format(packet_id, e), config["log_filename"])
 
             time.sleep(config["interval"])
 
-        log_event("Завершено: передача окончена", config["log_filename"])
-        print("Готово.")
+        log_event(T['finished'], config["log_filename"])
+        print(T['done'])
 
     except KeyboardInterrupt:
-        print("\nПрервано пользователем.")
-        log_event("Передача остановлена пользователем", config["log_filename"])
+        print("\n" + T['interrupted'])
+        log_event(T['user_stop'], config["log_filename"])
     finally:
         uart.close()
 
