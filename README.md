@@ -1,7 +1,7 @@
 📡 data_transfer
 
 <p align="center">
-  <img src="docs/img/General diagram of the equipment operation.png" alt="LoRa telemetry system diagram" width="600">
+  <img src="docs/img/111.png" alt="LoRa telemetry system diagram" width="600">
 </p>
 
 Python-based LoRa telemetry system for Raspberry Pi 4 and E22-900T22S (UART).  
