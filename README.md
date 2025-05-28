@@ -15,57 +15,87 @@ Features AES-128 encryption, CRC8 checksum, CSV logging, and automated data coll
 
 ```
 data_transfer/
-├── sender/          → main LoRa transmitter (UART)
-├── receiver/        → main LoRa receiver (UART)
-├── test/            → local tests (no LoRa hardware needed)
-├── logs_csv/        → tools for data download and cleanup
+├── sender/                  → main LoRa transmitter (UART)
+│   ├── sender.py            → manual version
+│   ├── clear_data.py
+│   └── autostart/           
+│       └── autostart_sender.py → non-interactive version for auto-run
+├── receiver/                
+│   ├── receiver.py          → manual version
+│   ├── clear_data.py
+│   └── autostart/           
+│       └── autostart_receiver.py → non-interactive version for auto-run
+├── logs_csv/                → data tools
+│   ├── clear_data.py
+│   └── download_data.py
+├── test/                    → local tests (no LoRa hardware)
+│   ├── sender_test.py
+│   ├── receiver_test.py
+│   ├── main_controller.py
+│   └── clear_data.py
 ```
 
 ---
 
 📦 Required Python Libraries
 
-The following Python libraries must be installed manually:
+Install manually:
 
-pyserial  
-pycryptodome
+* `pyserial` → UART communication
+* `pycryptodome` → AES encryption (ECB) and padding
 
-These are used for UART communication and AES encryption, respectively.
-
+Use `pip install pyserial pycryptodome` if needed.
 
 ---
 
 🔧 Main Components
 
-- `sender.py`: encrypts and sends telemetry packets over UART
-- `receiver.py`: receives packets, validates CRC8, decrypts, and logs
-- `sender_test.py`: local test of AES + CRC8 encryption
-- `receiver_test.py`: decrypts and checks test packet from file
-- `download_data.py`: copies result files from Raspberry Pi via SCP
-- `clear_data.py`: removes logs and data files for a clean session
-- `main_controller.py`: runs a simple CLI for testing and clearing
+* `autostart_sender.py`: auto-run version of the sender with no user interaction
+* `autostart_receiver.py`: auto-run version of the receiver
+* `sender.py`: legacy interactive version for UART transmission
+* `receiver.py`: legacy interactive version for receiving + logging
+* `sender_test.py`: test AES/CRC without hardware
+* `receiver_test.py`: validate decryption and CRC
+* `download_data.py`: pulls logs via SCP
+* `clear_data.py`: removes `.csv` and `.txt` files for fresh sessions
+* `main_controller.py`: basic test/control runner (legacy)
+
+---
+
+⚙️ Auto-Run Behavior
+
+Both `autostart_sender.py` and `autostart_receiver.py`:
+
+* Run without `input()`
+* Use preset configs (see top of each file)
+* Log to file (`*_log.txt`)
+* Designed for Raspberry Pi autostart via `systemd`, `rc.local`, or `crontab`
+
+Example timing:
+
+* Sender runs for 150s with 15s interval and 5s start delay
+* Receiver listens for 170s without delay
 
 ---
 
 📦 Data Output
 
-- `sent_data.csv` / `received_data.csv`: telemetry and status
-- `sender_log.txt` / `receiver_log.txt`: detailed event logs
-- `encrypted_packet.bin`: raw binary packet with AES + CRC8
+* `sent_data.csv` / `received_data.csv`: telemetry records
+* `sender_log.txt` / `receiver_log.txt`: events + debug logs
+* `encrypted_packet.bin`: optional raw binary (for test/debug)
 
 ---
 
 🔐 Encryption & Integrity
 
-- AES-128 in ECB mode for confidentiality
-- CRC8 checksum added for packet integrity
-- Default key: `"cat"` (can be changed in config)
+* AES-128 in ECB mode (default key: `"cat"`)
+* CRC8 checksum to detect corrupted packets
+* Configurable in `CONFIG` dict at the top of each script
 
 ---
 
-👥 Authors
+## 👥 Authors
 
-- Snopkov D. I.  
-- Shimpf A. A.  
-📅 Version: May 2025
-
+* Snopkov D. I.
+* Shimpf A. A.
+  📅 Version: May 2025
