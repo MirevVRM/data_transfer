@@ -1,1 +1,58 @@
+🚀 Quickstart Guide: UART Data Transfer System (Raspberry Pi + LoRa)
 
+🛠 What This System Does
+- Sends and receives encrypted telemetry via E22-900T22S LoRa modules.
+- Fully automatic: scripts launch on Raspberry Pi boot with no user input.
+
+📦 Setting Up Virtual Environment (venv)
+
+Recommended: work in your user home directory (/home/pi)
+
+1. Create and activate the virtual environment:
+    python3 -m venv ~/lora_env
+    source ~/lora_env/bin/activate
+
+2. Install required dependencies:
+    pip install pyserial pycryptodome
+
+Make sure the scripts use Python from your venv.
+
+🔄 Autostart Configuration via crontab
+
+1. Open crontab:
+    crontab -e
+
+2. Add these lines (adjust path as needed):
+
+👉 For Sender:
+    @reboot /home/pi/lora_env/bin/python3 /home/pi/data_transfer/sender/autostart/autostart_sender.py
+
+👉 For Receiver:
+    @reboot /home/pi/lora_env/bin/python3 /home/pi/data_transfer/receiver/autostart/autostart_receiver.py
+
+🧼 Clearing Logs & CSV Files
+
+Activate venv:
+    source ~/lora_env/bin/activate
+
+Run cleanup:
+    python3 clear_data.py
+
+📤 Download Logs via Wi-Fi
+
+On your PC or laptop:
+    python3 logs_csv/download_data.py
+
+⏱ Default Timings
+
+- Receiver: listens for 170 seconds, no delay
+- Sender: starts after 5 seconds, sends every 15 seconds for 150 seconds
+- These values are defined in the CONFIG block in autostart_*.py scripts
+
+📁 Output Files
+
+- sent_data.csv, sender_log.txt — stored on Sender Raspberry Pi
+- received_data.csv, receiver_log.txt — stored on Receiver Raspberry Pi
+
+📅 Version: May 2025
+✍️ Authors: Snopkov D. I., Shimpf A. A.
