@@ -1,4 +1,4 @@
-📡 data_transfer
+## 📡 data_transfer
 
 <p align="center">
   <img src="docs/img/General scheme.png" alt="LoRa telemetry system diagram" width="800">
@@ -11,7 +11,7 @@ Features AES-128 encryption, CRC8 checksum, CSV logging, and automated data coll
 
 ---
 
-📁 Project Structure
+## 📁 Project Structure
 
 ```
 data_transfer/
@@ -37,7 +37,7 @@ data_transfer/
 
 ---
 
-📦 Required Python Libraries
+## 📦 Required Python Libraries
 
 Install manually:
 
@@ -48,7 +48,7 @@ Use `pip install pyserial pycryptodome` if needed.
 
 ---
 
-🔧 Main Components
+## 🔧 Main Components
 
 * `autostart_sender.py`: auto-run version of the sender with no user interaction
 * `autostart_receiver.py`: auto-run version of the receiver
@@ -62,7 +62,7 @@ Use `pip install pyserial pycryptodome` if needed.
 
 ---
 
-⚙️ Auto-Run Behavior
+## ⚙️ Auto-Run Behavior
 
 Both `autostart_sender.py` and `autostart_receiver.py`:
 
@@ -78,7 +78,7 @@ Example timing:
 
 ---
 
-📦 Data Output
+## 📦 Data Output
 
 * `sent_data.csv` / `received_data.csv`: telemetry records
 * `sender_log.txt` / `receiver_log.txt`: events + debug logs
@@ -86,7 +86,7 @@ Example timing:
 
 ---
 
-🔐 Encryption & Integrity
+## 🔐 Encryption & Integrity
 
 * AES-128 in ECB mode (default key: `"cat"`)
 * CRC8 checksum to detect corrupted packets
