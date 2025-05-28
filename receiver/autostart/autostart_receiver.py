@@ -16,7 +16,7 @@ DEBUG = False
 CONFIG = {
     "LANG": "rus",
     "DELAY_BEFORE_START": 0,
-    "RECEIVE_DURATION": 120,
+    "RECEIVE_DURATION": 170,
     "UART_PORT": "/dev/ttyUSB0",
     "BAUDRATE": 9600,
     "AES_KEY": "cat",
