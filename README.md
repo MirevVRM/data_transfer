@@ -56,7 +56,7 @@ Use `pip install pyserial pycryptodome` if needed.
 * `receiver.py`: legacy interactive version for receiving + logging
 * `sender_test.py`: test AES/CRC without hardware
 * `receiver_test.py`: validate decryption and CRC
-* `download_data.py`: pulls logs via SCP
+* `download_data.py`: pulls data (`.csv`) and logs (`.txt`) via SCP
 * `clear_data.py`: removes `.csv` and `.txt` files for fresh sessions
 * `main_controller.py`: basic test/control runner (legacy)
 
@@ -68,6 +68,7 @@ Both `autostart_sender.py` and `autostart_receiver.py`:
 
 * Run without `input()`
 * Use preset configs (see top of each file)
+* Save data (`.csv`)
 * Log to file (`*_log.txt`)
 * Designed for Raspberry Pi autostart via `systemd`, `rc.local`, or `crontab`
 
