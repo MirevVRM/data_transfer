@@ -16,7 +16,7 @@ UART_PORT = "/dev/ttyUSB0"
 BAUDRATE = 9600
 AES_KEY = "cat".ljust(16)[:16].encode()
 RECEIVE_DURATION = 780  # 13 минут
-START_DELAY = 60        # Задержка перед стартом в секундах
+START_DELAY = 1        # Задержка перед стартом в секундах
 DEBUG = False
 
 # ========== Язык сообщений ==========
