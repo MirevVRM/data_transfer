@@ -15,7 +15,7 @@ from Crypto.Util.Padding import unpad
 UART_PORT = "/dev/ttyUSB0"
 BAUDRATE = 9600
 AES_KEY = "cat".ljust(16)[:16].encode()
-RECEIVE_DURATION = 850  # 13 минут
+RECEIVE_DURATION = 900  # 13 минут
 START_DELAY = 1        # Задержка перед стартом в секундах
 DEBUG = False
 
