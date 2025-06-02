@@ -27,7 +27,9 @@ TEXT = {
         'start_prompt': "\nНачать новый запуск? (y/n): ",
         'run_number': "Введите номер запуска: ",
         'distance': "Введите дистанцию (м): ",
-        'shutdown': "Завершение работы...",
+        'shutdown': "Завершение работы контроллера...",
+        'exit_script': "Завершение работы скрипта...",
+        'exit_choice': "Завершить только скрипт или выключить контроллер? [script/shutdown]: ",
         'port_error': "Не удалось открыть порт {}: {}",
         'run_start': "Запуск №{} на дистанции {} м",
         'packet_sent': "Отправлен пакет ID {}",
@@ -39,7 +41,9 @@ TEXT = {
         'start_prompt': "\nStart new run? (y/n): ",
         'run_number': "Enter run number: ",
         'distance': "Enter distance (m): ",
-        'shutdown': "Shutting down...",
+        'shutdown': "Shutting down controller...",
+        'exit_script': "Exiting script...",
+        'exit_choice': "Exit script only or shut down controller? [script/shutdown]: ",
         'port_error': "Failed to open port {}: {}",
         'run_start': "Run #{} at distance {} m",
         'packet_sent': "Packet ID {} sent",
@@ -117,8 +121,12 @@ def main():
     while True:
         choice = input(T['start_prompt']).strip().lower()
         if choice != 'y':
-            print(T['shutdown'])
-            os.system("sudo shutdown now")
+            action = input(T['exit_choice']).strip().lower()
+            if action == "shutdown":
+                print(T['shutdown'])
+                os.system("sudo shutdown now")
+            else:
+                print(T['exit_script'])
             break
 
         run_number = input(T['run_number']).strip()
