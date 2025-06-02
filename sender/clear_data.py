@@ -1,13 +1,14 @@
 # ========================================
-# Файл: clear_data.py
+# Файл: clear_data.py (обновлённый)
 # Авторы: Snopkov D. I., Shimpf A. A.
-# Версия: май 2025
+# Версия: июнь 2025
 # Назначение:
-#   - RU: Очистка локальных файлов данных и логов
-#   - EN: Clear local data and log files
+#   - RU: Очистка всех логов и данных
+#   - EN: Clear all logs and data
 # ========================================
 
 import os
+import glob
 from datetime import datetime
 
 # ========== Язык ==========
@@ -19,21 +20,21 @@ LANG = choose_language()
 
 TEXT = {
     'rus': {
-        'title': "=== Очистка данных ===",
-        'confirm': "Удалить все перечисленные файлы? (y/n): ",
+        'title': "=== Очистка данных и логов ===",
+        'confirm': "Удалить все файлы CSV и логов? (y/n): ",
         'cancelled': "Очистка отменена.",
         'cancelled_log': "Очистка отменена пользователем",
-        'start': "Запрос на очистку файлов",
+        'start': "Запрос на очистку",
         'deleted': "Удалён файл: {}",
         'not_found': "Файл не найден: {}",
         'done': "Очистка завершена"
     },
     'eng': {
-        'title': "=== Data Cleanup ===",
-        'confirm': "Delete all listed files? (y/n): ",
+        'title': "=== Data and Log Cleanup ===",
+        'confirm': "Delete all CSV and log files? (y/n): ",
         'cancelled': "Cleanup cancelled.",
         'cancelled_log': "Cleanup cancelled by user",
-        'start': "Request to clear files",
+        'start': "Cleanup initiated",
         'deleted': "File deleted: {}",
         'not_found': "File not found: {}",
         'done': "Cleanup completed"
@@ -41,18 +42,6 @@ TEXT = {
 }
 
 T = TEXT[LANG]
-
-FILES_TO_DELETE = [
-    "sent_data.csv",
-    "received_data.csv",
-    "encrypted_packet.bin",
-    "sender_log.txt",
-    "receiver_log.txt",
-    "main_log.txt",
-    "manage_log.txt",
-    "clear_log.txt"
-]
-
 LOG_FILE = "clear_log.txt"
 
 # ========== Логирование ==========
@@ -66,12 +55,40 @@ def log_event(text):
 # ========== Очистка ==========
 def clear_files():
     log_event(T['start'])
-    for file in FILES_TO_DELETE:
+
+    # Одиночные файлы
+    standalone_files = [
+        "sent_data.csv",
+        "received_data.csv",
+        "encrypted_packet.bin",
+        "sender_log.txt",
+        "receiver_log.txt",
+        "main_log.txt",
+        "manage_log.txt"
+    ]
+
+    # CSV и логи в папках
+    pattern_paths = [
+        "data/sent/*.csv",
+        "data/received/*.csv",
+        "logs/*.txt"
+    ]
+
+    for file in standalone_files:
         if os.path.exists(file):
             os.remove(file)
             log_event(T['deleted'].format(file))
         else:
             log_event(T['not_found'].format(file))
+
+    for pattern in pattern_paths:
+        for path in glob.glob(pattern):
+            try:
+                os.remove(path)
+                log_event(T['deleted'].format(path))
+            except Exception:
+                log_event(T['not_found'].format(path))
+
     log_event(T['done'])
 
 # ========== Запуск ==========
