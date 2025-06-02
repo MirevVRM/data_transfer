@@ -21,7 +21,7 @@ DEBUG = False
 # ========== Язык сообщений ==========
 LANG = "rus"  # или "eng"
 
-TEXT = {
+TEXTS = {
     'rus': {
         'start': "=== UART-Приёмник (autostart_receiver.py) ===",
         'start_log': "Приём по UART запущен",
@@ -50,7 +50,7 @@ TEXT = {
     }
 }
 
-T = TEXT[LANG]
+T = TEXTS[LANG]
 
 # ========== CRC8 ==========
 def crc8(data: bytes) -> int:
@@ -106,7 +106,7 @@ def save_to_csv(csvfile, packet_id, data, crc_ok):
 
 # ========== Основной цикл ==========
 def main():
-    print(TEXT['start'])
+    print(T['start'])
 
     run_number = get_next_run_number()
     log_filename = f"logs/log_run_{run_number}.txt"
@@ -117,10 +117,10 @@ def main():
     try:
         uart = serial.Serial(UART_PORT, BAUDRATE, timeout=1)
     except Exception as e:
-        log_event(log_filename, TEXT['port_error'].format(UART_PORT, e))
+        log_event(log_filename, T['port_error'].format(UART_PORT, e))
         return
 
-    log_event(log_filename, TEXT['start_log'])
+    log_event(log_filename, T['start_log'])
     start_time = time.time()
 
     try:
@@ -134,34 +134,34 @@ def main():
             crc_ok = (received_crc == calculated_crc)
 
             if not crc_ok:
-                log_event(log_filename, TEXT['crc_fail'])
+                log_event(log_filename, T['crc_fail'])
                 continue
 
             decrypted = decrypt_message(data)
             if decrypted is None:
-                log_event(log_filename, TEXT['decrypt_fail'])
+                log_event(log_filename, T['decrypt_fail'])
                 continue
 
             parts = decrypted.split(",")
             if len(parts) != 6:
-                log_event(log_filename, TEXT['format_error'])
+                log_event(log_filename, T['format_error'])
                 continue
 
             try:
                 packet_id = int(parts[0])
                 payload = list(map(int, parts[1:]))
             except ValueError:
-                log_event(log_filename, TEXT['value_error'])
+                log_event(log_filename, T['value_error'])
                 continue
 
             save_to_csv(csv_filename, packet_id, payload, crc_ok)
-            log_event(log_filename, TEXT['packet_saved'].format(packet_id))
+            log_event(log_filename, T['packet_saved'].format(packet_id))
 
     except KeyboardInterrupt:
-        log_event(log_filename, TEXT['user_stop'])
+        log_event(log_filename, T['user_stop'])
     finally:
         uart.close()
-        log_event(log_filename, TEXT['finished'])
+        log_event(log_filename, T['finished'])
         os.system("sudo shutdown now")
 
 if __name__ == '__main__':
