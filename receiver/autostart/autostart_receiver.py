@@ -1,5 +1,5 @@
 # ========================================
-# Файл: autostart_receiver.py (обновлённый)
+# Файл: autostart_receiver.py (обновлённый с таймером)
 # Версия: июнь 2025
 # ========================================
 
@@ -16,6 +16,7 @@ UART_PORT = "/dev/ttyUSB0"
 BAUDRATE = 9600
 AES_KEY = "cat".ljust(16)[:16].encode()
 RECEIVE_DURATION = 780  # 13 минут
+START_DELAY = 60        # Задержка перед стартом в секундах
 DEBUG = False
 
 # ========== Язык сообщений ==========
@@ -33,7 +34,8 @@ TEXTS = {
         'user_stop': "Приём остановлен вручную",
         'finished': "Приём завершён",
         'done': "Готово.",
-        'port_error': "Не удалось открыть порт {}: {}"
+        'port_error': "Не удалось открыть порт {}: {}",
+        'delay': "Задержка перед запуском: {} сек"
     },
     'eng': {
         'start': "=== UART Receiver (autostart_receiver.py) ===",
@@ -46,7 +48,8 @@ TEXTS = {
         'user_stop': "Reception stopped manually",
         'finished': "Reception completed",
         'done': "Done.",
-        'port_error': "Failed to open port {}: {}"
+        'port_error': "Failed to open port {}: {}",
+        'delay': "Startup delay: {} sec"
     }
 }
 
@@ -111,8 +114,11 @@ def main():
     run_number = get_next_run_number()
     log_filename = f"logs/log_run_{run_number}.txt"
     csv_filename = f"data/received/received_run_{run_number}.csv"
-
     os.makedirs("data/received", exist_ok=True)
+
+    # Задержка перед стартом
+    log_event(log_filename, T['delay'].format(START_DELAY))
+    time.sleep(START_DELAY)
 
     try:
         uart = serial.Serial(UART_PORT, BAUDRATE, timeout=1)
