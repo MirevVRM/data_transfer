@@ -1,34 +1,29 @@
 # ========================================
-# Файл: autostart_receiver.py (UART-версия) — автозапуск
-# Версия: май 2025
+# Файл: autostart_receiver.py (обновлённый)
+# Версия: июнь 2025
 # ========================================
 
 import csv
+import os
 import time
 import serial
 from datetime import datetime
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
-# ========== Константы и конфиг ==========
+# ========== Конфигурация ==========
+UART_PORT = "/dev/ttyUSB0"
+BAUDRATE = 9600
+AES_KEY = "cat".ljust(16)[:16].encode()
+RECEIVE_DURATION = 780  # 13 минут
 DEBUG = False
 
-CONFIG = {
-    "LANG": "rus",
-    "DELAY_BEFORE_START": 0,
-    "RECEIVE_DURATION": 170,
-    "UART_PORT": "/dev/ttyUSB0",
-    "BAUDRATE": 9600,
-    "AES_KEY": "cat",
-    "CSV_FILENAME": "received_data.csv",
-    "LOG_FILENAME": "receiver_log.txt",
-}
+# ========== Язык сообщений ==========
+LANG = "rus"  # или "eng"
 
 TEXT = {
     'rus': {
-        'start': "=== UART-Приёмник (receiver.py) ===",
-        'wait': "Ожидание {} сек перед запуском...",
-        'port_error': "Не удалось открыть порт {}: {}",
+        'start': "=== UART-Приёмник (autostart_receiver.py) ===",
         'start_log': "Приём по UART запущен",
         'crc_fail': "CRC не совпадает — пакет отброшен",
         'decrypt_fail': "Ошибка расшифровки пакета",
@@ -37,34 +32,25 @@ TEXT = {
         'packet_saved': "Пакет ID {} сохранён",
         'user_stop': "Приём остановлен вручную",
         'finished': "Приём завершён",
-        'done': "Готово."
+        'done': "Готово.",
+        'port_error': "Не удалось открыть порт {}: {}"
     },
     'eng': {
-        'start': "=== UART Receiver (receiver.py) ===",
-        'wait': "Waiting {} seconds before start...",
-        'port_error': "Failed to open port {}: {}",
+        'start': "=== UART Receiver (autostart_receiver.py) ===",
         'start_log': "UART reception started",
         'crc_fail': "CRC mismatch — packet dropped",
         'decrypt_fail': "Packet decryption failed",
         'format_error': "Invalid decrypted data format",
         'value_error': "Data conversion error",
         'packet_saved': "Packet ID {} saved",
-        'user_stop': "Reception stopped by user",
+        'user_stop': "Reception stopped manually",
         'finished': "Reception completed",
-        'done': "Done."
+        'done': "Done.",
+        'port_error': "Failed to open port {}: {}"
     }
 }
 
-T = TEXT[CONFIG["LANG"]]
-
-# ========== Логирование ==========
-def log_event(text):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    line = f"[{timestamp}] {text}"
-    if DEBUG:
-        print(line)
-    with open(CONFIG["LOG_FILENAME"], "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+T = TEXT[LANG]
 
 # ========== CRC8 ==========
 def crc8(data: bytes) -> int:
@@ -76,29 +62,43 @@ def crc8(data: bytes) -> int:
             crc &= 0xFF
     return crc
 
-# ========== Расшифровка AES ==========
-def decrypt_message(ciphertext, key_str):
-    key = key_str.ljust(16)[:16].encode()
-    cipher = AES.new(key, AES.MODE_ECB)
+# ========== AES Расшифровка ==========
+def decrypt_message(ciphertext):
     try:
+        cipher = AES.new(AES_KEY, AES.MODE_ECB)
         decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
         return decrypted.decode()
     except Exception:
         return None
 
-# ========== Сохранение в CSV ==========
-def save_to_csv(packet_id, data, crc_ok, rssi, snr):
-    header = ['packet_id', 'timestamp', 'temperature', 'pressure', 'humidity',
-              'density', 'concentration', 'crc_ok', 'rssi', 'snr']
+# ========== Логирование ==========
+def log_event(logfile, text):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    row = [packet_id, timestamp] + data + [crc_ok, rssi, snr]
-    file_exists = False
-    try:
-        with open(CONFIG["CSV_FILENAME"], 'r'):
-            file_exists = True
-    except FileNotFoundError:
-        pass
-    with open(CONFIG["CSV_FILENAME"], 'a', newline='') as f:
+    line = f"[{timestamp}] {text}"
+    if DEBUG:
+        print(line)
+    with open(logfile, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+# ========== Поиск следующего номера запуска ==========
+def get_next_run_number(log_dir="logs"):
+    os.makedirs(log_dir, exist_ok=True)
+    existing = [f for f in os.listdir(log_dir) if f.startswith("log_run_") and f.endswith(".txt")]
+    numbers = []
+    for f in existing:
+        parts = f.replace("log_run_", "").replace(".txt", "")
+        if parts.isdigit():
+            numbers.append(int(parts))
+    return max(numbers, default=0) + 1
+
+# ========== Сохранение в CSV ==========
+def save_to_csv(csvfile, packet_id, data, crc_ok):
+    header = ['packet_id', 'timestamp', 'temperature', 'pressure', 'humidity',
+              'density', 'concentration', 'crc_ok']
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    row = [packet_id, timestamp] + data + [crc_ok]
+    file_exists = os.path.exists(csvfile)
+    with open(csvfile, 'a', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
             writer.writerow(header)
@@ -106,28 +106,25 @@ def save_to_csv(packet_id, data, crc_ok, rssi, snr):
 
 # ========== Основной цикл ==========
 def main():
-    if DEBUG:
-        print(T['start'])
+    print(TEXT['start'])
 
-    if CONFIG["DELAY_BEFORE_START"] > 0:
-        log_event(T['wait'].format(CONFIG["DELAY_BEFORE_START"]))
-        time.sleep(CONFIG["DELAY_BEFORE_START"])
+    run_number = get_next_run_number()
+    log_filename = f"logs/log_run_{run_number}.txt"
+    csv_filename = f"data/received/received_run_{run_number}.csv"
+
+    os.makedirs("data/received", exist_ok=True)
 
     try:
-        uart = serial.Serial(
-            port=CONFIG["UART_PORT"],
-            baudrate=CONFIG["BAUDRATE"],
-            timeout=1
-        )
+        uart = serial.Serial(UART_PORT, BAUDRATE, timeout=1)
     except Exception as e:
-        log_event(T['port_error'].format(CONFIG["UART_PORT"], e))
+        log_event(log_filename, TEXT['port_error'].format(UART_PORT, e))
         return
 
-    log_event(T['start_log'])
+    log_event(log_filename, TEXT['start_log'])
     start_time = time.time()
 
     try:
-        while time.time() - start_time < CONFIG["RECEIVE_DURATION"]:
+        while time.time() - start_time < RECEIVE_DURATION:
             raw = uart.read(33)
             if not raw or len(raw) < 17:
                 continue
@@ -137,39 +134,35 @@ def main():
             crc_ok = (received_crc == calculated_crc)
 
             if not crc_ok:
-                log_event(T['crc_fail'])
+                log_event(log_filename, TEXT['crc_fail'])
                 continue
 
-            decrypted = decrypt_message(data, CONFIG["AES_KEY"])
+            decrypted = decrypt_message(data)
             if decrypted is None:
-                log_event(T['decrypt_fail'])
+                log_event(log_filename, TEXT['decrypt_fail'])
                 continue
 
             parts = decrypted.split(",")
             if len(parts) != 6:
-                log_event(T['format_error'])
+                log_event(log_filename, TEXT['format_error'])
                 continue
 
             try:
                 packet_id = int(parts[0])
                 payload = list(map(int, parts[1:]))
             except ValueError:
-                log_event(T['value_error'])
+                log_event(log_filename, TEXT['value_error'])
                 continue
 
-            rssi = None
-            snr = None
-
-            save_to_csv(packet_id, payload, crc_ok, rssi, snr)
-            log_event(T['packet_saved'].format(packet_id))
+            save_to_csv(csv_filename, packet_id, payload, crc_ok)
+            log_event(log_filename, TEXT['packet_saved'].format(packet_id))
 
     except KeyboardInterrupt:
-        log_event(T['user_stop'])
+        log_event(log_filename, TEXT['user_stop'])
     finally:
         uart.close()
-        log_event(T['finished'])
-        if DEBUG:
-            print(T['done'])
+        log_event(log_filename, TEXT['finished'])
+        os.system("sudo shutdown now")
 
 if __name__ == '__main__':
     main()
