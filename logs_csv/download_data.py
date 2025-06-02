@@ -1,10 +1,8 @@
 # ========================================
 # Файл: download_data.py
-# Авторы: Snopkov D. I., Shimpf A. A.
-# Версия: май 2025
-# Назначение:
-#   - RU: Загрузка CSV и лог-файлов с Raspberry Pi по SCP
-#   - EN: Download CSV and log files from Raspberry Pi via SCP
+# Авторы: Snopkov D. I., Shimpf A. A. (обновлён)
+# Версия: июнь 2025
+# Назначение: Скачивание всех логов и .csv с Raspberry Pi по SCP
 # ========================================
 
 import subprocess
@@ -20,25 +18,25 @@ LANG = choose_language()
 
 TEXT = {
     'rus': {
-        'title': "=== Загрузка файлов с Raspberry Pi по SCP ===",
+        'title': "=== Загрузка всех логов и CSV с Raspberry Pi ===",
         'prompt': "Введите данные для подключения к Raspberry Pi:",
         'user': "Имя пользователя [по умолчанию: pi]: ",
         'host': "IP или имя Raspberry Pi [по умолчанию: raspberrypi.local]: ",
-        'path': "Путь к файлам на Pi [по умолчанию: /home/pi/]: ",
+        'path': "Базовый путь на Pi [по умолчанию: /home/pi/]: ",
         'connecting': "Подключение к {user}@{host}",
-        'downloading': "Начинается загрузка файлов из {path}",
-        'success': "Загружен: {file}",
-        'fail': "Не удалось загрузить: {file}",
+        'downloading': "Загрузка папок logs/, data/ и data/received/ из {path}",
+        'success': "Загружено: {file}",
+        'fail': "Ошибка загрузки: {file}",
         'done': "Загрузка завершена"
     },
     'eng': {
-        'title': "=== Downloading files from Raspberry Pi via SCP ===",
+        'title': "=== Downloading all logs and CSV from Raspberry Pi ===",
         'prompt': "Enter connection details for Raspberry Pi:",
         'user': "Username [default: pi]: ",
         'host': "IP or hostname [default: raspberrypi.local]: ",
-        'path': "Path to files on Pi [default: /home/pi/]: ",
+        'path': "Base path on Pi [default: /home/pi/]: ",
         'connecting': "Connecting to {user}@{host}",
-        'downloading': "Starting download from {path}",
+        'downloading': "Downloading folders logs/, data/, and data/received/ from {path}",
         'success': "Downloaded: {file}",
         'fail': "Failed to download: {file}",
         'done': "Download complete"
@@ -46,14 +44,6 @@ TEXT = {
 }
 
 T = TEXT[LANG]
-
-# ========== Файлы для загрузки ==========
-FILES = [
-    "sent_data.csv",
-    "received_data.csv",
-    "sender_log.txt",
-    "receiver_log.txt"
-]
 
 LOG_FILE = "download_log.txt"
 DEST_FOLDER = "D:/logs_csv"
@@ -66,7 +56,7 @@ def log_event(text):
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
-# ========== Запрос настроек ==========
+# ========== Запрос подключения ==========
 def get_connection_info():
     print(T['prompt'])
     user = input(T['user']).strip() or "pi"
@@ -74,25 +64,25 @@ def get_connection_info():
     path = input(T['path']).strip() or "/home/pi/"
     return user, host, path
 
-# ========== Загрузка ==========
-def download_files(user, host, remote_path):
-    os.makedirs(DEST_FOLDER, exist_ok=True)
-    log_event(T['connecting'].format(user=user, host=host))
-    log_event(T['downloading'].format(path=remote_path))
-
-    for file in FILES:
-        remote = f"{user}@{host}:{remote_path}/{file}"
-        destination = os.path.join(DEST_FOLDER, file)
-        try:
-            subprocess.run(["scp", remote, destination], check=True)
-            log_event(T['success'].format(file=file))
-        except subprocess.CalledProcessError:
-            log_event(T['fail'].format(file=file))
-
-    log_event(T['done'])
+# ========== Загрузка директорий ==========
+def download_directory(user, host, remote_base, subdir):
+    os.makedirs(os.path.join(DEST_FOLDER, subdir), exist_ok=True)
+    remote = f"{user}@{host}:{remote_base}/{subdir}/*"
+    local = os.path.join(DEST_FOLDER, subdir)
+    try:
+        subprocess.run(["scp", "-r", remote, local], check=True)
+        log_event(T['success'].format(file=subdir))
+    except subprocess.CalledProcessError:
+        log_event(T['fail'].format(file=subdir))
 
 # ========== Запуск ==========
 if __name__ == "__main__":
     print(T['title'])
-    user, host, path = get_connection_info()
-    download_files(user, host, path)
+    user, host, base_path = get_connection_info()
+    log_event(T['connecting'].format(user=user, host=host))
+    log_event(T['downloading'].format(path=base_path))
+
+    for folder in ["logs", "data", "data/received"]:
+        download_directory(user, host, base_path, folder)
+
+    log_event(T['done'])
