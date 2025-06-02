@@ -14,6 +14,42 @@ from datetime import datetime
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
+# ========== Выбор языка ==========
+def choose_language():
+    lang = input("Выберите язык / Choose language [Rus/Eng] (по умолчанию: Rus): ").strip().lower()
+    return 'eng' if lang == 'eng' else 'rus'
+
+LANG = choose_language()
+
+TEXT = {
+    'rus': {
+        'start': "=== UART-Передатчик (sender_controlled.py) ===",
+        'start_prompt': "\nНачать новый запуск? (y/n): ",
+        'run_number': "Введите номер запуска: ",
+        'distance': "Введите дистанцию (м): ",
+        'shutdown': "Завершение работы...",
+        'port_error': "Не удалось открыть порт {}: {}",
+        'run_start': "Запуск №{} на дистанции {} м",
+        'packet_sent': "Отправлен пакет ID {}",
+        'packet_error': "Ошибка отправки ID {}: {}",
+        'run_done': "Завершено: отправлено {} пакетов."
+    },
+    'eng': {
+        'start': "=== UART Transmitter (sender_controlled.py) ===",
+        'start_prompt': "\nStart new run? (y/n): ",
+        'run_number': "Enter run number: ",
+        'distance': "Enter distance (m): ",
+        'shutdown': "Shutting down...",
+        'port_error': "Failed to open port {}: {}",
+        'run_start': "Run #{} at distance {} m",
+        'packet_sent': "Packet ID {} sent",
+        'packet_error': "Failed to send ID {}: {}",
+        'run_done': "Completed: {} packets sent."
+    }
+}
+
+T = TEXT[LANG]
+
 # ========== Параметры UART и AES ==========
 UART_PORT = "/dev/ttyUSB0"
 BAUDRATE = 9600
@@ -71,21 +107,22 @@ def save_csv(csvfile, packet_id, params, run_number, distance):
 
 # ========== Основной цикл ==========
 def main():
+    print(T['start'])
     try:
         uart = serial.Serial(UART_PORT, BAUDRATE, timeout=1)
     except Exception as e:
-        print(f"Не удалось открыть порт {UART_PORT}: {e}")
+        print(T['port_error'].format(UART_PORT, e))
         return
 
     while True:
-        choice = input("\nНачать новый запуск? (y/n): ").strip().lower()
+        choice = input(T['start_prompt']).strip().lower()
         if choice != 'y':
-            print("Завершение работы...")
+            print(T['shutdown'])
             os.system("sudo shutdown now")
             break
 
-        run_number = input("Введите номер запуска: ").strip()
-        distance = input("Введите дистанцию (м): ").strip()
+        run_number = input(T['run_number']).strip()
+        distance = input(T['distance']).strip()
 
         log_filename = f"logs/log_run_{run_number}_{distance}m.txt"
         csv_filename = f"data/sent_run_{run_number}_{distance}m.csv"
@@ -93,9 +130,9 @@ def main():
         os.makedirs("logs", exist_ok=True)
         os.makedirs("data", exist_ok=True)
 
-        log_event(log_filename, f"Запуск №{run_number} на дистанции {distance} м")
+        log_event(log_filename, T['run_start'].format(run_number, distance))
 
-        for i in range(PACKET_COUNT):
+        for _ in range(PACKET_COUNT):
             packet_id = int(time.time())
             params = generate_parameters()
             message = f"{packet_id}," + ",".join(map(str, params))
@@ -105,14 +142,14 @@ def main():
 
             try:
                 uart.write(full_packet)
-                log_event(log_filename, f"Отправлен пакет ID {packet_id}")
+                log_event(log_filename, T['packet_sent'].format(packet_id))
                 save_csv(csv_filename, packet_id, params, run_number, distance)
             except Exception as e:
-                log_event(log_filename, f"Ошибка отправки ID {packet_id}: {e}")
+                log_event(log_filename, T['packet_error'].format(packet_id, e))
 
             time.sleep(SEND_INTERVAL)
 
-        log_event(log_filename, f"Завершено: отправлено {PACKET_COUNT} пакетов.")
+        log_event(log_filename, T['run_done'].format(PACKET_COUNT))
 
 if __name__ == '__main__':
     main()
