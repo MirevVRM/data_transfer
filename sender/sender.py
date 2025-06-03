@@ -1,17 +1,15 @@
 # ========================================
-# Файл: sender.py (UART-версия)
+# Файл: sender.py
 # Автор: Snopkov D. I., Shimpf A.A.
-# Версия: май 2025
-# Назначение:
-#   - RU: Отправка телеметрических пакетов по UART-модулю E22-900T22S
-#   - EN: Transmitting telemetry packets over UART module E22-900T22S
-#   - Шифрование (AES-128) + CRC8
+# Версия: июнь 2025
+# Назначение: Интерактивная отправка 250 пакетов с отметкой дистанции и номера запуска
 # ========================================
 
 import csv
 import random
 import time
 import serial
+import os
 from datetime import datetime
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
@@ -25,80 +23,43 @@ LANG = choose_language()
 
 TEXT = {
     'rus': {
-        'start': "=== UART-Передатчик (sender.py) ===",
-        'input_prompt': "Ввод параметров скрипта (нажмите Enter для значения по умолчанию)",
-        'delay': "Задержка перед запуском (сек): ",
-        'duration': "Общая длительность работы (сек): ",
-        'interval': "Интервал между отправками (сек): ",
-        'input_error': "Ошибка ввода. Используются значения по умолчанию.",
-        'wait': "Ожидание {} сек перед запуском...",
+        'start': "=== UART-Передатчик (sender_controlled.py) ===",
+        'start_prompt': "\nНачать новый запуск? (y/n): ",
+        'run_number': "Введите номер запуска: ",
+        'distance': "Введите дистанцию (м): ",
+        'shutdown': "Завершение работы контроллера...",
+        'exit_script': "Завершение работы скрипта...",
+        'exit_choice': "Завершить только скрипт или выключить контроллер? [script/shutdown]: ",
         'port_error': "Не удалось открыть порт {}: {}",
-        'start_log': "Старт передачи данных через UART",
-        'param': "Параметры:",
-        'packet_built': "Сформирован пакет ID {}: {}",
-        'sent': "Пакет отправлен.",
-        'sent_log': "Отправлен пакет ID {}",
-        'send_error': "Ошибка при отправке пакета ID {}: {}",
-        'done': "Готово.",
-        'finished': "Завершено: передача окончена",
-        'interrupted': "Прервано пользователем.",
-        'user_stop': "Передача остановлена пользователем"
+        'run_start': "Запуск №{} на дистанции {} м",
+        'packet_sent': "Отправлен пакет ID {}",
+        'packet_error': "Ошибка отправки ID {}: {}",
+        'run_done': "Завершено: отправлено {} пакетов."
     },
     'eng': {
-        'start': "=== UART Transmitter (sender.py) ===",
-        'input_prompt': "Enter script parameters (press Enter to use defaults)",
-        'delay': "Delay before start (sec): ",
-        'duration': "Total run time (sec): ",
-        'interval': "Interval between transmissions (sec): ",
-        'input_error': "Input error. Using default values.",
-        'wait': "Waiting {} sec before start...",
+        'start': "=== UART Transmitter (sender_controlled.py) ===",
+        'start_prompt': "\nStart new run? (y/n): ",
+        'run_number': "Enter run number: ",
+        'distance': "Enter distance (m): ",
+        'shutdown': "Shutting down controller...",
+        'exit_script': "Exiting script...",
+        'exit_choice': "Exit script only or shut down controller? [script/shutdown]: ",
         'port_error': "Failed to open port {}: {}",
-        'start_log': "Starting data transmission over UART",
-        'param': "Parameters:",
-        'packet_built': "Packet ID {} generated: {}",
-        'sent': "Packet sent.",
-        'sent_log': "Packet ID {} sent",
-        'send_error': "Failed to send packet ID {}: {}",
-        'done': "Done.",
-        'finished': "Completed: transmission finished",
-        'interrupted': "Interrupted by user.",
-        'user_stop': "Transmission interrupted by user"
+        'run_start': "Run #{} at distance {} m",
+        'packet_sent': "Packet ID {} sent",
+        'packet_error': "Failed to send ID {}: {}",
+        'run_done': "Completed: {} packets sent."
     }
 }
 
 T = TEXT[LANG]
 
-# ========== Логирование ==========
-def log_event(text, logfile):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    line = f"[{timestamp}] {text}"
-    print(line)
-    with open(logfile, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
-
-# ========== Конфигурация ==========
-def get_config():
-    print(T['input_prompt'])
-    try:
-        delay = int(input(T['delay']) or 0)
-        duration = int(input(T['duration']) or 90)
-        interval = int(input(T['interval']) or 30)
-    except ValueError:
-        print(T['input_error'])
-        delay = 0
-        duration = 90
-        interval = 30
-
-    return {
-        "delay": delay,
-        "duration": duration,
-        "interval": interval,
-        "csv_filename": "sent_data.csv",
-        "log_filename": "sender_log.txt",
-        "aes_key": "cat",
-        "uart_port": "/dev/ttyUSB0",
-        "baudrate": 9600
-    }
+# ========== Параметры UART и AES ==========
+UART_PORT = "/dev/ttyUSB0"
+BAUDRATE = 9600
+AES_KEY = "cat".ljust(16)[:16].encode()
+PACKET_COUNT = 250
+SEND_INTERVAL = 3  # секунды
 
 # ========== Генерация параметров ==========
 def generate_parameters():
@@ -109,29 +70,6 @@ def generate_parameters():
         random.randint(1, 5),
         random.randint(50, 150)
     ]
-
-# ========== Сохранение в CSV ==========
-def save_to_csv(packet_id, data, filename):
-    header = ['packet_id', 'timestamp', 'temperature', 'pressure', 'humidity', 'density', 'concentration']
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    row = [packet_id, timestamp] + data
-    file_exists = False
-    try:
-        with open(filename, 'r'):
-            file_exists = True
-    except FileNotFoundError:
-        pass
-    with open(filename, 'a', newline='') as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(header)
-        writer.writerow(row)
-
-# ========== Шифрование AES ==========
-def encrypt_message(message, key_str):
-    key = key_str.ljust(16)[:16].encode()
-    cipher = AES.new(key, AES.MODE_ECB)
-    return cipher.encrypt(pad(message.encode(), AES.block_size))
 
 # ========== CRC8 ==========
 def crc8(data: bytes) -> int:
@@ -146,61 +84,80 @@ def crc8(data: bytes) -> int:
             crc &= 0xFF
     return crc
 
+# ========== AES Шифрование ==========
+def encrypt_message(message):
+    cipher = AES.new(AES_KEY, AES.MODE_ECB)
+    return cipher.encrypt(pad(message.encode(), AES.block_size))
+
+# ========== Логирование ==========
+def log_event(logfile, text):
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    line = f"[{timestamp}] {text}"
+    print(line)
+    with open(logfile, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+# ========== Сохранение CSV ==========
+def save_csv(csvfile, packet_id, params, run_number, distance):
+    header = ['packet_id', 'timestamp', 'temperature', 'pressure', 'humidity', 'density', 'concentration', 'run_number', 'distance_m']
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    row = [packet_id, timestamp] + params + [run_number, distance]
+    file_exists = os.path.exists(csvfile)
+    with open(csvfile, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(header)
+        writer.writerow(row)
+
 # ========== Основной цикл ==========
 def main():
     print(T['start'])
-    config = get_config()
-
-    if config["delay"] > 0:
-        print(T['wait'].format(config["delay"]))
-        time.sleep(config["delay"])
-
     try:
-        uart = serial.Serial(
-            port=config["uart_port"],
-            baudrate=config["baudrate"],
-            timeout=1
-        )
+        uart = serial.Serial(UART_PORT, BAUDRATE, timeout=1)
     except Exception as e:
-        print(T['port_error'].format(config["uart_port"], e))
+        print(T['port_error'].format(UART_PORT, e))
         return
 
-    log_event(T['start_log'], config["log_filename"])
-    start_time = time.time()
+    while True:
+        choice = input(T['start_prompt']).strip().lower()
+        if choice != 'y':
+            action = input(T['exit_choice']).strip().lower()
+            if action == "shutdown":
+                print(T['shutdown'])
+                os.system("sudo shutdown now")
+            else:
+                print(T['exit_script'])
+            break
 
-    try:
-        while time.time() - start_time < config["duration"]:
+        run_number = input(T['run_number']).strip()
+        distance = input(T['distance']).strip()
+
+        log_filename = f"logs/log_run_{run_number}_{distance}m.txt"
+        csv_filename = f"data/sent_run_{run_number}_{distance}m.csv"
+
+        os.makedirs("logs", exist_ok=True)
+        os.makedirs("data", exist_ok=True)
+
+        log_event(log_filename, T['run_start'].format(run_number, distance))
+
+        for _ in range(PACKET_COUNT):
             packet_id = int(time.time())
             params = generate_parameters()
-
-            print(T['param'], params)
-            log_event(T['packet_built'].format(packet_id, params), config["log_filename"])
-
-            save_to_csv(packet_id, params, config["csv_filename"])
-
             message = f"{packet_id}," + ",".join(map(str, params))
-            encrypted = encrypt_message(message, config["aes_key"])
+            encrypted = encrypt_message(message)
             crc = crc8(encrypted)
             full_packet = encrypted + bytes([crc])
 
             try:
                 uart.write(full_packet)
-                print(T['sent'])
-                log_event(T['sent_log'].format(packet_id), config["log_filename"])
+                log_event(log_filename, T['packet_sent'].format(packet_id))
+                save_csv(csv_filename, packet_id, params, run_number, distance)
             except Exception as e:
-                print(T['send_error'].format(packet_id, e))
-                log_event(T['send_error'].format(packet_id, e), config["log_filename"])
+                log_event(log_filename, T['packet_error'].format(packet_id, e))
 
-            time.sleep(config["interval"])
+            time.sleep(SEND_INTERVAL)
 
-        log_event(T['finished'], config["log_filename"])
-        print(T['done'])
-
-    except KeyboardInterrupt:
-        print("\n" + T['interrupted'])
-        log_event(T['user_stop'], config["log_filename"])
-    finally:
-        uart.close()
+        log_event(log_filename, T['run_done'].format(PACKET_COUNT))
 
 if __name__ == '__main__':
     main()
