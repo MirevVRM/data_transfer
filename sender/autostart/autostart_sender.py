@@ -1,5 +1,5 @@
 # ========================================
-# Файл: autostart_sender.py (автозапуск + выключение)
+# Файл: autostart_sender.py (автозапуск + логика запуска)
 # Версия: июнь 2025
 # ========================================
 
@@ -12,19 +12,17 @@ from datetime import datetime
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
-# ========== Константы и конфигурация ==========
+# ========== Конфигурация ==========
 DEBUG = False
 
 CONFIG = {
     "LANG": "rus",
     "DELAY_BEFORE_START": 5,
-    "DURATION": 150,  # в секундах
-    "INTERVAL": 15,   # в секундах
+    "DURATION": 150,
+    "INTERVAL": 15,
     "UART_PORT": "/dev/ttyUSB0",
     "BAUDRATE": 9600,
-    "AES_KEY": "cat",
-    "CSV_FILENAME": "sent_data.csv",
-    "LOG_FILENAME": "sender_log.txt",
+    "AES_KEY": "cat"
 }
 
 TEXT = {
@@ -62,13 +60,24 @@ TEXT = {
 
 T = TEXT[CONFIG["LANG"]]
 
+# ========== Подготовка директорий и счётчика ==========
+def get_next_run_number(log_dir="logs"):
+    os.makedirs(log_dir, exist_ok=True)
+    existing = [f for f in os.listdir(log_dir) if f.startswith("log_run_") and f.endswith(".txt")]
+    numbers = []
+    for f in existing:
+        parts = f.replace("log_run_", "").replace(".txt", "")
+        if parts.isdigit():
+            numbers.append(int(parts))
+    return max(numbers, default=0) + 1
+
 # ========== Логирование ==========
-def log_event(text):
+def log_event(logfile, text):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     line = f"[{timestamp}] {text}"
     if DEBUG:
         print(line)
-    with open(CONFIG["LOG_FILENAME"], "a", encoding="utf-8") as f:
+    with open(logfile, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
 # ========== Генерация параметров ==========
@@ -82,12 +91,12 @@ def generate_parameters():
     ]
 
 # ========== Сохранение в CSV ==========
-def save_to_csv(packet_id, data):
+def save_to_csv(csvfile, packet_id, data):
     header = ['packet_id', 'timestamp', 'temperature', 'pressure', 'humidity', 'density', 'concentration']
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     row = [packet_id, timestamp] + data
-    file_exists = os.path.exists(CONFIG["CSV_FILENAME"])
-    with open(CONFIG["CSV_FILENAME"], 'a', newline='') as f:
+    file_exists = os.path.exists(csvfile)
+    with open(csvfile, 'a', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
             writer.writerow(header)
@@ -111,11 +120,17 @@ def crc8(data: bytes) -> int:
 
 # ========== Основной цикл ==========
 def main():
-    if DEBUG:
-        print(T['start'])
+    print(T['start'])
+
+    run_number = get_next_run_number()
+    log_filename = f"logs/log_run_{run_number}.txt"
+    csv_filename = f"data/sent_run_{run_number}.csv"
+
+    os.makedirs("logs", exist_ok=True)
+    os.makedirs("data", exist_ok=True)
 
     if CONFIG["DELAY_BEFORE_START"] > 0:
-        log_event(T['wait'].format(CONFIG["DELAY_BEFORE_START"]))
+        log_event(log_filename, T['wait'].format(CONFIG["DELAY_BEFORE_START"]))
         time.sleep(CONFIG["DELAY_BEFORE_START"])
 
     try:
@@ -125,10 +140,10 @@ def main():
             timeout=1
         )
     except Exception as e:
-        log_event(T['port_error'].format(CONFIG["UART_PORT"], e))
+        log_event(log_filename, T['port_error'].format(CONFIG["UART_PORT"], e))
         return
 
-    log_event(T['start_log'])
+    log_event(log_filename, T['start_log'])
     start_time = time.time()
 
     try:
@@ -139,8 +154,8 @@ def main():
             if DEBUG:
                 print(T['param'], params)
 
-            log_event(T['packet_built'].format(packet_id, params))
-            save_to_csv(packet_id, params)
+            log_event(log_filename, T['packet_built'].format(packet_id, params))
+            save_to_csv(csv_filename, packet_id, params)
 
             message = f"{packet_id}," + ",".join(map(str, params))
             encrypted = encrypt_message(message, CONFIG["AES_KEY"])
@@ -151,22 +166,22 @@ def main():
                 uart.write(full_packet)
                 if DEBUG:
                     print(T['sent'])
-                log_event(T['sent_log'].format(packet_id))
+                log_event(log_filename, T['sent_log'].format(packet_id))
             except Exception as e:
-                log_event(T['send_error'].format(packet_id, e))
+                log_event(log_filename, T['send_error'].format(packet_id, e))
 
             time.sleep(CONFIG["INTERVAL"])
 
-        log_event(T['finished'])
+        log_event(log_filename, T['finished'])
         if DEBUG:
             print(T['done'])
 
     except KeyboardInterrupt:
-        log_event(T['user_stop'])
+        log_event(log_filename, T['user_stop'])
 
     finally:
         uart.close()
-        log_event(T['shutdown'])
+        log_event(log_filename, T['shutdown'])
         os.system("sudo shutdown now")
 
 if __name__ == '__main__':
