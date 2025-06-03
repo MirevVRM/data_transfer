@@ -1,0 +1,3 @@
+packet_id,timestamp,temperature,pressure,humidity,density,concentration,crc_ok
+1748943893,2025-06-03 14:24:49,23,982,58,3,99,True
+1748944163,2025-06-03 14:29:19,22,998,52,4,77,True
