@@ -1,58 +1,137 @@
-🚀 Quickstart Guide: UART Data Transfer System (Raspberry Pi + LoRa)
+🚀 Data Transmission System Startup Guide (UART + Raspberry Pi)
 
-🛠 What This System Does
-- Sends and receives encrypted telemetry via E22-900T22S LoRa modules.
-- Fully automatic: scripts launch on Raspberry Pi boot with no user input.
+---
 
-📦 Setting Up Virtual Environment (venv)
+🛠 What the System Does
 
-Recommended: work in your user home directory (/home/pi)
+* Transmits and receives **encrypted LoRa packets** via **E22-900T22S** modules over **UART**.
+* Fully **automated**: starts on Raspberry Pi boot.
+* Uses **AES-128** + **CRC8**, saves data to `.csv` and `.txt`.
 
-1. Create and activate the virtual environment:
-    python3 -m venv ~/lora_env
-    source ~/lora_env/bin/activate
+---
 
-2. Install required dependencies:
-    pip install pyserial pycryptodome
+📦 Virtual Environment Setup (venv)
 
-Make sure the scripts use Python from your venv.
+**Recommended to run everything from the home directory (`/home/pi`)**
 
-🔄 Autostart Configuration via crontab
+1. Create the environment:
 
-1. Open crontab:
-    crontab -e
+```bash
+python3 -m venv ~/lora_env
+```
 
-2. Add these lines (adjust path as needed):
+2. Activate it:
 
-👉 For Sender:
-    @reboot /home/pi/lora_env/bin/python3 /home/pi/data_transfer/sender/autostart/autostart_sender.py
+```bash
+source ~/lora_env/bin/activate
+```
 
-👉 For Receiver:
-    @reboot /home/pi/lora_env/bin/python3 /home/pi/data_transfer/receiver/autostart/autostart_receiver.py
+3. Install dependencies:
 
-🧼 Clearing Logs & CSV Files
+```bash
+pip install pyserial pycryptodome
+```
 
-Activate venv:
-    source ~/lora_env/bin/activate
+> Make sure your scripts point to the Python binary from the venv.
 
-Run cleanup:
-    python3 clear_data.py
+---
 
-📤 Download Logs via Wi-Fi
+🔄 Auto-Start via `crontab`
 
-On your PC or laptop:
-    python3 logs_csv/download_data.py
+1. Open the editor:
 
-⏱ Default Timings
+```bash
+crontab -e
+```
 
-- Receiver: listens for 170 seconds, no delay
-- Sender: starts after 5 seconds, sends every 15 seconds for 150 seconds
-- These values are defined in the CONFIG block in autostart_*.py scripts
+2. Add the following lines:
 
-📁 Output Files
+👉 Transmitter (Sender):
 
-- sent_data.csv, sender_log.txt — stored on Sender Raspberry Pi
-- received_data.csv, receiver_log.txt — stored on Receiver Raspberry Pi
+```
+@reboot /home/pi/lora_env/bin/python3 /home/pi/data_transfer/sender/autostart/autostart_sender.py
+```
 
-📅 Version: May 2025
-✍️ Authors: Snopkov D. I., Shimpf A. A.
+👉 Receiver:
+
+```
+@reboot /home/pi/lora_env/bin/python3 /home/pi/data_transfer/receiver/autostart/autostart_receiver.py
+```
+
+> The scripts run **autonomously** and end with a **controlled system shutdown**.
+
+---
+
+🧼 Clearing Logs and CSVs
+
+1. Activate the environment:
+
+```bash
+source ~/lora_env/bin/activate
+```
+
+2. Clear data:
+
+```bash
+python3 sender/clear_data.py         # for transmitter
+python3 receiver/clear_data.py       # for receiver
+python3 logs_csv/clear_data.py       # clear all logs and data
+```
+
+---
+
+### 📤 Downloading Logs from Raspberry Pi (via Wi-Fi)
+
+On a laptop / PC:
+
+```bash
+python3 logs_csv/download_data.py
+```
+
+> You must specify the Pi’s IP address and destination path in the script.
+
+---
+
+⏱ Runtime Parameters (Default)
+
+| Script   | Delay | Duration | Interval | Shutdown |
+| -------- | ----- | -------- | -------- | -------- |
+| Sender   | 5 sec | 150 sec  | 15 sec   | ✅ Yes    |
+| Receiver | 1 sec | 170 sec  | —        | ✅ Yes    |
+
+> All values are configurable via `CONFIG` at the top of each `autostart_*.py` script.
+
+---
+
+📁 File Naming Format
+
+In manual mode (`sender.py`, `receiver.py`):
+
+* `data/sent_run_<number>_<distance>m.csv`
+* `data/received_run_<number>_<distance>m.csv`
+* `logs/log_run_<number>_<distance>m.txt`
+
+In autostart mode:
+
+* `data/sent_run_<number>.csv`
+* `data/received_run_<number>.csv`
+* `logs/log_run_<number>.txt`
+
+> Run numbers increment automatically.
+
+---
+
+🔐 Encryption & Integrity
+
+* **Encryption**: AES-128, ECB mode, PKCS7 padding
+* **Data integrity**: CRC8 checksum
+* All algorithms are implemented locally without external APIs
+
+---
+
+👥 Authors
+
+* **Snopkov D. I.**
+* **Shimpf A. A.**
+
+📅 **Version:** June 2025
