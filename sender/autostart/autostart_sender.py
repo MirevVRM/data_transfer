@@ -1,12 +1,13 @@
 # ========================================
-# Файл: autostart_sender.py (UART-версия) — автозапуск
-# Версия: май 2025
+# Файл: autostart_sender.py (автозапуск + выключение)
+# Версия: июнь 2025
 # ========================================
 
 import csv
 import random
 import time
 import serial
+import os
 from datetime import datetime
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
@@ -17,8 +18,8 @@ DEBUG = False
 CONFIG = {
     "LANG": "rus",
     "DELAY_BEFORE_START": 5,
-    "DURATION": 150,
-    "INTERVAL": 15,
+    "DURATION": 150,  # в секундах
+    "INTERVAL": 15,   # в секундах
     "UART_PORT": "/dev/ttyUSB0",
     "BAUDRATE": 9600,
     "AES_KEY": "cat",
@@ -28,7 +29,7 @@ CONFIG = {
 
 TEXT = {
     'rus': {
-        'start': "=== UART-Передатчик (sender.py) ===",
+        'start': "=== UART-Передатчик (autostart_sender.py) ===",
         'wait': "Ожидание {} сек перед запуском...",
         'port_error': "Не удалось открыть порт {}: {}",
         'start_log': "Старт передачи данных через UART",
@@ -39,10 +40,11 @@ TEXT = {
         'send_error': "Ошибка при отправке пакета ID {}: {}",
         'done': "Готово.",
         'finished': "Завершено: передача окончена",
-        'user_stop': "Передача остановлена пользователем"
+        'user_stop': "Передача остановлена пользователем",
+        'shutdown': "Завершение работы контроллера..."
     },
     'eng': {
-        'start': "=== UART Transmitter (sender.py) ===",
+        'start': "=== UART Transmitter (autostart_sender.py) ===",
         'wait': "Waiting {} sec before start...",
         'port_error': "Failed to open port {}: {}",
         'start_log': "Starting data transmission over UART",
@@ -53,7 +55,8 @@ TEXT = {
         'send_error': "Failed to send packet ID {}: {}",
         'done': "Done.",
         'finished': "Completed: transmission finished",
-        'user_stop': "Transmission interrupted by user"
+        'user_stop': "Transmission interrupted by user",
+        'shutdown': "Shutting down controller..."
     }
 }
 
@@ -83,12 +86,7 @@ def save_to_csv(packet_id, data):
     header = ['packet_id', 'timestamp', 'temperature', 'pressure', 'humidity', 'density', 'concentration']
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     row = [packet_id, timestamp] + data
-    file_exists = False
-    try:
-        with open(CONFIG["CSV_FILENAME"], 'r'):
-            file_exists = True
-    except FileNotFoundError:
-        pass
+    file_exists = os.path.exists(CONFIG["CSV_FILENAME"])
     with open(CONFIG["CSV_FILENAME"], 'a', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
@@ -165,8 +163,11 @@ def main():
 
     except KeyboardInterrupt:
         log_event(T['user_stop'])
+
     finally:
         uart.close()
+        log_event(T['shutdown'])
+        os.system("sudo shutdown now")
 
 if __name__ == '__main__':
     main()
