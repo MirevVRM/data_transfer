@@ -1,7 +1,7 @@
 # ========================================
-# Файл: receiver.py (UART-версия)
+# Файл: receiver.py (UART-версия) (ручной режим + язык + завершение)
 # Автор: Snopkov D. I., Shimpf A.A.
-# Версия: май 2025
+# Версия: июнь 2025
 # Назначение:
 #   - RU: Приём зашифрованных пакетов с CRC8 по UART от E22-900T22S
 #   - EN: Receiving AES-encrypted CRC8 packets via UART from E22-900T22S
@@ -9,90 +9,66 @@
 # ========================================
 
 import csv
+import os
 import time
 import serial
 from datetime import datetime
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
-# ========== Выбор языка ==========
+# ========== Язык ==========
 def choose_language():
     lang = input("Выберите язык / Choose language [Rus/Eng] (по умолчанию: Rus): ").strip().lower()
     return 'eng' if lang == 'eng' else 'rus'
 
 LANG = choose_language()
 
-TEXT = {
+TEXTS = {
     'rus': {
         'start': "=== UART-Приёмник (receiver.py) ===",
-        'input_prompt': "Ввод параметров скрипта (Enter — по умолчанию)",
-        'delay': "Задержка перед запуском (сек): ",
-        'duration': "Время приёма (сек): ",
-        'input_error': "Ошибка ввода. Применяются значения по умолчанию.",
-        'wait': "Ожидание {} сек перед запуском...",
-        'port_error': "Не удалось открыть порт {}: {}",
+        'run_number': "Введите номер запуска: ",
+        'distance': "Введите дистанцию (м): ",
         'start_log': "Приём по UART запущен",
         'crc_fail': "CRC не совпадает — пакет отброшен",
         'decrypt_fail': "Ошибка расшифровки пакета",
         'format_error': "Неверный формат расшифрованных данных",
         'value_error': "Ошибка преобразования данных",
         'packet_saved': "Пакет ID {} сохранён",
-        'interrupted': "Прервано пользователем.",
         'user_stop': "Приём остановлен вручную",
         'finished': "Приём завершён",
-        'done': "Готово."
+        'done': "Готово.",
+        'port_error': "Не удалось открыть порт {}: {}",
+        'exit_choice': "Завершить только скрипт или выключить контроллер? [script/shutdown]: ",
+        'shutdown': "Завершение работы контроллера...",
+        'exit_script': "Завершение работы скрипта..."
     },
     'eng': {
         'start': "=== UART Receiver (receiver.py) ===",
-        'input_prompt': "Enter script parameters (press Enter for default)",
-        'delay': "Delay before start (sec): ",
-        'duration': "Reception time (sec): ",
-        'input_error': "Input error. Default values will be used.",
-        'wait': "Waiting {} seconds before start...",
-        'port_error': "Failed to open port {}: {}",
+        'run_number': "Enter run number: ",
+        'distance': "Enter distance (m): ",
         'start_log': "UART reception started",
         'crc_fail': "CRC mismatch — packet dropped",
         'decrypt_fail': "Packet decryption failed",
         'format_error': "Invalid decrypted data format",
         'value_error': "Data conversion error",
         'packet_saved': "Packet ID {} saved",
-        'interrupted': "Interrupted by user.",
-        'user_stop': "Reception stopped by user",
+        'user_stop': "Reception stopped manually",
         'finished': "Reception completed",
-        'done': "Done."
+        'done': "Done.",
+        'port_error': "Failed to open port {}: {}",
+        'exit_choice': "Exit script only or shut down controller? [script/shutdown]: ",
+        'shutdown': "Shutting down controller...",
+        'exit_script': "Exiting script..."
     }
 }
 
-T = TEXT[LANG]
+T = TEXTS[LANG]
 
-# ========== Логирование ==========
-def log_event(text, logfile):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    line = f"[{timestamp}] {text}"
-    print(line)
-    with open(logfile, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
-
-# ========== Настройки ==========
-def get_config():
-    print(T['input_prompt'])
-    try:
-        delay = int(input(T['delay']) or 0)
-        duration = int(input(T['duration']) or 120)
-    except ValueError:
-        print(T['input_error'])
-        delay = 0
-        duration = 120
-
-    return {
-        "delay": delay,
-        "duration": duration,
-        "csv_filename": "received_data.csv",
-        "log_filename": "receiver_log.txt",
-        "aes_key": "cat",
-        "uart_port": "/dev/ttyUSB0",
-        "baudrate": 9600
-    }
+# ========== Конфигурация ==========
+UART_PORT = "/dev/ttyUSB0"
+BAUDRATE = 9600
+AES_KEY = "cat".ljust(16)[:16].encode()
+DEBUG = False
 
 # ========== CRC8 ==========
 def crc8(data: bytes) -> int:
@@ -100,36 +76,36 @@ def crc8(data: bytes) -> int:
     for byte in data:
         crc ^= byte
         for _ in range(8):
-            if crc & 0x80:
-                crc = (crc << 1) ^ 0x07
-            else:
-                crc <<= 1
+            crc = (crc << 1) ^ 0x07 if crc & 0x80 else crc << 1
             crc &= 0xFF
     return crc
 
-# ========== Расшифровка AES ==========
-def decrypt_message(ciphertext, key_str):
-    key = key_str.ljust(16)[:16].encode()
-    cipher = AES.new(key, AES.MODE_ECB)
+# ========== AES Расшифровка ==========
+def decrypt_message(ciphertext):
     try:
+        cipher = AES.new(AES_KEY, AES.MODE_ECB)
         decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
         return decrypted.decode()
     except Exception:
         return None
 
-# ========== Сохранение в CSV ==========
-def save_to_csv(packet_id, data, crc_ok, rssi, snr, filename):
-    header = ['packet_id', 'timestamp', 'temperature', 'pressure', 'humidity',
-              'density', 'concentration', 'crc_ok', 'rssi', 'snr']
+# ========== Логирование ==========
+def log_event(logfile, text):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    row = [packet_id, timestamp] + data + [crc_ok, rssi, snr]
-    file_exists = False
-    try:
-        with open(filename, 'r'):
-            file_exists = True
-    except FileNotFoundError:
-        pass
-    with open(filename, 'a', newline='') as f:
+    line = f"[{timestamp}] {text}"
+    if DEBUG:
+        print(line)
+    with open(logfile, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+# ========== Сохранение в CSV ==========
+def save_to_csv(csvfile, packet_id, data, crc_ok):
+    header = ['packet_id', 'timestamp', 'temperature', 'pressure', 'humidity',
+              'density', 'concentration', 'crc_ok']
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    row = [packet_id, timestamp] + data + [crc_ok]
+    file_exists = os.path.exists(csvfile)
+    with open(csvfile, 'a', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
             writer.writerow(header)
@@ -138,28 +114,26 @@ def save_to_csv(packet_id, data, crc_ok, rssi, snr, filename):
 # ========== Основной цикл ==========
 def main():
     print(T['start'])
-    config = get_config()
 
-    if config["delay"] > 0:
-        print(T['wait'].format(config["delay"]))
-        time.sleep(config["delay"])
+    run_number = input(T['run_number']).strip()
+    distance = input(T['distance']).strip()
+
+    log_filename = f"logs/log_run_{run_number}_{distance}m.txt"
+    csv_filename = f"data/received/received_run_{run_number}_{distance}m.csv"
+    os.makedirs("logs", exist_ok=True)
+    os.makedirs("data/received", exist_ok=True)
 
     try:
-        uart = serial.Serial(
-            port=config["uart_port"],
-            baudrate=config["baudrate"],
-            timeout=1
-        )
+        uart = serial.Serial(UART_PORT, BAUDRATE, timeout=1)
     except Exception as e:
-        print(T['port_error'].format(config["uart_port"], e))
+        log_event(log_filename, T['port_error'].format(UART_PORT, e))
         return
 
-    log_event(T['start_log'], config["log_filename"])
-    start_time = time.time()
+    log_event(log_filename, T['start_log'])
 
     try:
-        while time.time() - start_time < config["duration"]:
-            raw = uart.read(33)  # 32 байта AES + 1 байт CRC
+        while True:
+            raw = uart.read(33)
             if not raw or len(raw) < 17:
                 continue
 
@@ -168,39 +142,43 @@ def main():
             crc_ok = (received_crc == calculated_crc)
 
             if not crc_ok:
-                log_event(T['crc_fail'], config["log_filename"])
+                log_event(log_filename, T['crc_fail'])
                 continue
 
-            decrypted = decrypt_message(data, config["aes_key"])
+            decrypted = decrypt_message(data)
             if decrypted is None:
-                log_event(T['decrypt_fail'], config["log_filename"])
+                log_event(log_filename, T['decrypt_fail'])
                 continue
 
             parts = decrypted.split(",")
             if len(parts) != 6:
-                log_event(T['format_error'], config["log_filename"])
+                log_event(log_filename, T['format_error'])
                 continue
 
             try:
                 packet_id = int(parts[0])
                 payload = list(map(int, parts[1:]))
             except ValueError:
-                log_event(T['value_error'], config["log_filename"])
+                log_event(log_filename, T['value_error'])
                 continue
 
-            rssi = None
-            snr = None
-
-            save_to_csv(packet_id, payload, crc_ok, rssi, snr, config["csv_filename"])
-            log_event(T['packet_saved'].format(packet_id), config["log_filename"])
+            save_to_csv(csv_filename, packet_id, payload, crc_ok)
+            log_event(log_filename, T['packet_saved'].format(packet_id))
 
     except KeyboardInterrupt:
-        print("\n" + T['interrupted'])
-        log_event(T['user_stop'], config["log_filename"])
+        log_event(log_filename, T['user_stop'])
     finally:
         uart.close()
-        log_event(T['finished'], config["log_filename"])
+        log_event(log_filename, T['finished'])
         print(T['done'])
+
+        action = input(T['exit_choice']).strip().lower()
+        if action == "shutdown":
+            print(T['shutdown'])
+            os.system("sudo shutdown now")
+        else:
+            print(T['exit_script'])
 
 if __name__ == '__main__':
     main()
+
