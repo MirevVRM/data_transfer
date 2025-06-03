@@ -14,29 +14,42 @@ Features AES-128 encryption, CRC8 checksum, CSV logging, and automated data coll
 ## 📁 Project Structure
 
 ```
-data_transfer/
-├── sender/
-│   ├── sender.py                  → manual interactive transmitter
-│   ├── clear_data.py              → delete sent logs/data
-│   └── autostart/
-│       └── autostart_sender.py    → auto-run sender with AES + CRC + shutdown
-├── receiver/
-│   ├── receiver.py                → manual interactive receiver
-│   ├── clear_data.py              → delete received logs/data
-│   └── autostart/
-│       └── autostart_receiver.py  → auto-run receiver with AES + CRC + shutdown
-├── logs_csv/
-│   ├── clear_data.py              → remove all CSV and log files
-│   └── download_data.py           → pull logs and data via SCP
-├── test/
-│   ├── sender_test.py             → offline packet encryption test
-│   ├── receiver_test.py           → offline packet decryption + CRC test
-│   ├── main_controller.py         → legacy control/test stub
-│   └── clear_data.py              → cleanup for tests
-├── Instructions/
-│   ├── Instruction_rus.txt        → user manual (RU)
-│   └── Instruction_eng.txt        → user manual (EN)
-├── docs/img/                      → illustrations and diagrams
+experimental_results_logs_csv/         # Main folder for data and logs
+├── data/
+│   ├── sender/                        → CSV data sent in each run
+│   └── received/                      → CSV data received and verified
+├── logs/
+│   ├── sender_log/                    → transmission logs (TXT)
+│   └── receiver_log/                  → reception logs (TXT)
+├── combined_data.xlsx                 → final merged Excel dataset
+
+logs_csv/                              # Scripts for working with CSV data
+├── clear_data.py                      → utility to clean all logs and CSVs
+├── download_data.py                   → fetch CSV/logs from external source (e.g. SBC)
+
+receiver/
+├── receiver.py                        → manual receiver: AES + CRC + save to CSV
+├── clear_data.py                      → clear local receiver logs/data
+└── autostart/
+    └── autostart_receiver.py         → automated headless receiver script
+
+sender/
+├── sender.py                          → manual sender: AES + CRC packet transmitter
+├── clear_data.py                      → clear local sender logs/data
+└── autostart/
+    └── autostart_sender.py           → automated headless sender script
+
+test/                                  # Unit test and control files
+├── sender_test.py                     → offline test: AES packet encryption
+├── receiver_test.py                   → offline test: AES + CRC decryption
+├── main_controller.py                 → legacy or integration test script
+└── clear_data.py                      → test data cleaner
+
+Instructions/                          # User guides
+├── Instruction_rus.txt                → инструкция (на русском)
+└── Instruction_eng.txt                → user manual (in English)
+
+docs/img/                              → diagrams, figures, illustrations
 ```
 
 ---
