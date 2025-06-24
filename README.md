@@ -31,13 +31,15 @@ receiver/
 ├── receiver.py                        → manual receiver: AES + CRC + save to CSV
 ├── clear_data.py                      → clear local receiver logs/data
 └── autostart/
-    └── autostart_receiver.py         → automated headless receiver script
+    ├── autostart_receiver.py         → legacy automated receiver script (short duration)
+    └── autostart_receiver_24h.py     → automated 24-hour headless receiver script
 
 sender/
 ├── sender.py                          → manual sender: AES + CRC packet transmitter
 ├── clear_data.py                      → clear local sender logs/data
 └── autostart/
-    └── autostart_sender.py           → automated headless sender script
+    ├── autostart_sender.py           → legacy automated sender script (short duration)
+    └── autostart_sender_24h.py       → automated 24-hour headless sender script
 
 test/                                  # Unit test and control files
 ├── sender_test.py                     → offline test: AES packet encryption
@@ -73,8 +75,10 @@ pip install pyserial pycryptodome
 | ----------------------- | ------------------------------------------------------ |
 | `sender.py`             | Manual sender: prompts for run number + distance       |
 | `receiver.py`           | Manual receiver: logs and stores packets interactively |
-| `autostart_sender.py`   | Auto-start sender: uses internal config, shuts down    |
-| `autostart_receiver.py` | Auto-start receiver: listens, logs, then shuts down    |
+| `autostart_sender.py`   | Legacy auto-start sender: short duration, auto-shutdown |
+| `autostart_sender_24h.py` | Auto-start sender: generates packets every 30s for 24h |
+| `autostart_receiver.py` | Legacy auto-start receiver: short duration, auto-shutdown |
+| `autostart_receiver_24h.py` | Auto-start receiver: listens and logs for 24 hours |
 | `sender_test.py`        | Tests encryption/CRC generation (no UART needed)       |
 | `receiver_test.py`      | Tests decryption/CRC checking (offline)                |
 | `download_data.py`      | Downloads `.csv`/`.txt` from device via SCP            |
@@ -85,27 +89,22 @@ pip install pyserial pycryptodome
 
 ## ⚙️ Auto-Run Behavior
 
-Both `autostart_sender.py` and `autostart_receiver.py`:
+| Script                   | Duration | Interval | Delay | Shutdown | Description                       |
+|--------------------------|----------|----------|-------|----------|-----------------------------------|
+| `autostart_sender.py`    | 150s     | 15s      | 5s    | ✅ Yes    | Legacy sender with short duration |
+| `autostart_sender_24h.py`| 24h      | 30s      | 5s    | ❌ No     | 24-hour sender, no auto-shutdown  |
+| `autostart_receiver.py`  | 170s     | —        | 1s    | ✅ Yes    | Legacy receiver with short duration |
+| `autostart_receiver_24h.py` | 24h   | —        | 1s    | ❌ No     | 24-hour receiver, no auto-shutdown |
 
-* Require **no user interaction**
-* Use internal `CONFIG` parameters
+* All scripts require **no user interaction** and use internal `CONFIG` parameters.
 * Automatically **generate unique filenames** per run:
-
-  * `data/sent_run_<n>.csv`
-  * `data/received_run_<n>.csv`
+  * `data/sender/sent_run_<n>.csv`
+  * `data/received/received_run_<n>.csv`
   * `logs/log_run_<n>.txt`
 * Designed for **autostart on Raspberry Pi**:
-
   * `systemd` unit
   * `crontab @reboot`
   * or `/etc/rc.local`
-
-🕒 **Default timing (example):**
-
-| Role     | Duration | Interval | Delay | Shutdown |
-| -------- | -------- | -------- | ----- | -------- |
-| Sender   | 150 s    | 15 s     | 5 s   | ✅ Yes    |
-| Receiver | 170 s    | —        | 1 s   | ✅ Yes    |
 
 ---
 
